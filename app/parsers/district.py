@@ -67,7 +67,7 @@ _TIME_RE = re.compile(r"\b(\d{1,2}:\d{2})\s*(AM|PM)\b", re.I)
 
 # Noise text that appears inside venue name container
 _NOISE_RE = re.compile(
-    r"(allows?\s+cancellation|non-cancellable|non cancellable|\d+\.?\d*\s*km\s*away"
+    r"(allows?\s+cancellation|non-cancellable|non cancellable|\d+[\d\.\+]*\s*km(?:\s*away)?"
     r"|filling\s+fast|almost\s+full|available)",
     re.I
 )

@@ -5,9 +5,10 @@ All core Pydantic models used across parsers, compare engine, and notifiers.
 from __future__ import annotations
 
 from datetime import datetime
+import re
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class ShowEntry(BaseModel):
@@ -34,6 +35,15 @@ class ShowEntry(BaseModel):
 
     def formats_set(self) -> set[str]:
         return {f.upper() for f in self.formats}
+
+    @field_validator("theatre", mode="after")
+    @classmethod
+    def clean_name(cls, v: str) -> str:
+        if not v:
+            return ""
+        # Strip dynamic distance noise like '99+ km away' or '12.5 km away'
+        v = re.sub(r"\s*\b\d+[\d\.\+]*\s*km(?:\s*away)?\b", "", v, flags=re.I)
+        return re.sub(r"\s+", " ", v).strip()
 
 
 class SourceSnapshot(BaseModel):

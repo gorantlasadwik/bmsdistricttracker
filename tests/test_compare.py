@@ -37,6 +37,14 @@ def test_no_change_returns_empty():
     assert changes == []
 
 
+def test_distance_suffix_ignored():
+    """Dynamic distance strings like '99+ km away' should be stripped and not trigger new_theatre."""
+    old = make_snapshot([{"theatre": "MovieMax PR Mall, Wall Tax Road, Chennai", "shows": ["09:00"], "formats": [], "language": "", "booking_open": True}])
+    new = make_snapshot([{"theatre": "MovieMax PR Mall, Wall Tax Road, Chennai 99+ km away", "shows": ["09:00"], "formats": [], "language": "", "booking_open": True}])
+    changes = diff_snapshots(old, new)
+    assert changes == []
+
+
 def test_first_run_returns_empty():
     """First run (old=None) should not trigger notifications."""
     new = make_snapshot([{"theatre": "AGS", "shows": ["09:00"], "formats": [], "language": "Tamil", "booking_open": False}])
