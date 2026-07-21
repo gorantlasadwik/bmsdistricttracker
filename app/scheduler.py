@@ -23,59 +23,76 @@ from app.parsers.district import DistrictParser
 # Global scheduler instance (accessed by API for status checks)
 scheduler = AsyncIOScheduler(timezone="UTC")
 
-# Track last/next scan times
-_last_scan: datetime | None = None
+# Track active scans to prevent concurrent overlapping executions
+_active_scans: set[int] = set()
+_active_scans_lock = asyncio.Lock()
 _scan_lock = asyncio.Lock()
-
 _bms_parser = BookMyShowParser()
 _district_parser = DistrictParser()
 
 
+def is_scanning(movie_id: int) -> bool:
+    return movie_id in _active_scans
+
+
 async def scan_movie(movie: MovieConfig, manual: bool = False, send_whatsapp: bool = False) -> None:
     """Fetch + compare + notify for a single movie across all sources."""
-    async with _scan_lock:
-        global _last_scan
-        _last_scan = datetime.utcnow()
-
-    logger.info(f"[Scheduler] Starting scan for '{movie.name}' (id={movie.id}), manual={manual}, send_whatsapp={send_whatsapp}")
-
-    tasks = []
-    if movie.bms_url:
-        tasks.append(_scan_source(movie, _bms_parser, movie.bms_url))
-    if movie.district_url:
-        tasks.append(_scan_source(movie, _district_parser, movie.district_url))
-
-    if not tasks:
-        logger.warning(f"[Scheduler] '{movie.name}' has no URLs configured. Skipping.")
+    if not movie.id:
         return
 
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+    async with _active_scans_lock:
+        if movie.id in _active_scans:
+            logger.warning(f"[Scheduler] Scan already in progress for '{movie.name}' (id={movie.id}). Skipping.")
+            return
+        _active_scans.add(movie.id)
 
-    snapshots = []
-    for r in results:
-        if isinstance(r, Exception):
-            logger.error(f"[Scheduler] Scan task raised: {r}")
-        elif r is not None:
-            snapshots.append(r)
+    try:
+        async with _scan_lock:
+            global _last_scan
+            _last_scan = datetime.utcnow()
 
-    # Send current status report if this is a manual trigger
-    if manual and snapshots:
-        if send_whatsapp:
-            try:
-                from app.notifier.whatsapp import WhatsAppNotifier
-                wa_notifier = WhatsAppNotifier()
-                await wa_notifier.send_status_report(movie.name, snapshots)
-            except Exception as e:
-                logger.error(f"[Scheduler] Failed to send manual WhatsApp status report: {e}")
-        else:
-            try:
-                from app.notifier.telegram import TelegramNotifier
-                tel_notifier = TelegramNotifier()
-                await tel_notifier.send_status_report(movie.name, snapshots)
-            except Exception as e:
-                logger.error(f"[Scheduler] Failed to send manual status report: {e}")
+        logger.info(f"[Scheduler] Starting scan for '{movie.name}' (id={movie.id}), manual={manual}, send_whatsapp={send_whatsapp}")
 
-    logger.info(f"[Scheduler] Scan complete for '{movie.name}'")
+        tasks = []
+        if movie.bms_url:
+            tasks.append(_scan_source(movie, _bms_parser, movie.bms_url))
+        if movie.district_url:
+            tasks.append(_scan_source(movie, _district_parser, movie.district_url))
+
+        if not tasks:
+            logger.warning(f"[Scheduler] '{movie.name}' has no URLs configured. Skipping.")
+            return
+
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        snapshots = []
+        for r in results:
+            if isinstance(r, Exception):
+                logger.error(f"[Scheduler] Scan task raised: {r}")
+            elif r is not None:
+                snapshots.append(r)
+
+        # Send current status report if this is a manual trigger
+        if manual and snapshots:
+            if send_whatsapp:
+                try:
+                    from app.notifier.whatsapp import WhatsAppNotifier
+                    wa_notifier = WhatsAppNotifier()
+                    await wa_notifier.send_status_report(movie.name, snapshots)
+                except Exception as e:
+                    logger.error(f"[Scheduler] Failed to send manual WhatsApp status report: {e}")
+            else:
+                try:
+                    from app.notifier.telegram import TelegramNotifier
+                    tel_notifier = TelegramNotifier()
+                    await tel_notifier.send_status_report(movie.name, snapshots)
+                except Exception as e:
+                    logger.error(f"[Scheduler] Failed to send manual status report: {e}")
+
+        logger.info(f"[Scheduler] Scan complete for '{movie.name}'")
+    finally:
+        async with _active_scans_lock:
+            _active_scans.discard(movie.id)
 
 
 async def _scan_source(movie: MovieConfig, parser, url: str) -> SourceSnapshot | None:

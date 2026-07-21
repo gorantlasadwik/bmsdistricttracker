@@ -537,12 +537,20 @@
   }
 
   async function triggerScan(id, name, whatsapp = false) {
+    const card = document.getElementById(`movie-${id}`);
+    const buttons = card ? card.querySelectorAll('.btn') : [];
+    buttons.forEach(btn => btn.disabled = true);
+
     try {
       const query = whatsapp ? '?whatsapp=true' : '';
       await apiFetch(`/movies/${id}/scan` + query, { method: 'POST' });
       toast(whatsapp ? `💬 WhatsApp report triggered for "${name}"` : `⚡ Scan triggered for "${name}"`);
+      setTimeout(() => {
+        buttons.forEach(btn => btn.disabled = false);
+      }, 30000);
     } catch (e) {
       toast(e.message, 'error');
+      buttons.forEach(btn => btn.disabled = false);
     }
   }
 
