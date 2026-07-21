@@ -78,6 +78,37 @@ async def init_db() -> None:
         await db.execute(_CREATE_SCAN_LOG)
         await db.commit()
     logger.info(f"Database initialised at {DB_PATH}")
+    await _auto_seed()
+
+
+async def _auto_seed() -> None:
+    """Insert initial movies if database is empty."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("SELECT COUNT(*) FROM movies") as cursor:
+            count = (await cursor.fetchone())[0]
+
+    if count == 0:
+        logger.info("[Database] Empty database detected. Auto-seeding default movies.")
+        movies = [
+            MovieConfig(
+                name="Spider-Man: Brand New Day (Regular/3D)",
+                city="Chennai",
+                bms_url="https://in.bookmyshow.com/movies/chennai/spider-man-brand-new-day/buytickets/ET00502600/20260801",
+                district_url="https://www.district.in/movies/spider-man-brand-new-day-movie-tickets-in-chennai-MV194537?frmtid=rrfdpndypd&fromdate=2026-08-01",
+                interval=180,
+                enabled=True
+            ),
+            MovieConfig(
+                name="Spider-Man: Brand New Day (EPIQ 3D)",
+                city="Chennai",
+                bms_url="https://in.bookmyshow.com/movies/chennai/spider-man-brand-new-day-epiq-3d/buytickets/ET00505581/20260801",
+                district_url="",
+                interval=180,
+                enabled=True
+            )
+        ]
+        for m in movies:
+            await add_movie(m)
 
 
 # ── Movie CRUD ─────────────────────────────────────────────────────────────────
