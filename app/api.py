@@ -169,14 +169,14 @@ async def remove_movie(movie_id: int):
 
 
 @app.post("/movies/{movie_id}/scan", tags=["Movies"])
-async def trigger_scan(movie_id: int):
+async def trigger_scan(movie_id: int, whatsapp: bool = False):
     """Trigger an immediate scan for a specific movie."""
     movie = await db.get_movie(movie_id)
     if not movie:
         raise HTTPException(status_code=404, detail="Movie not found.")
 
     import asyncio
-    asyncio.create_task(sched.scan_movie(movie, manual=True))
+    asyncio.create_task(sched.scan_movie(movie, manual=True, send_whatsapp=whatsapp))
 
     return {"message": f"Scan triggered for '{movie.name}'"}
 

@@ -31,13 +31,13 @@ _bms_parser = BookMyShowParser()
 _district_parser = DistrictParser()
 
 
-async def scan_movie(movie: MovieConfig, manual: bool = False) -> None:
+async def scan_movie(movie: MovieConfig, manual: bool = False, send_whatsapp: bool = False) -> None:
     """Fetch + compare + notify for a single movie across all sources."""
     async with _scan_lock:
         global _last_scan
         _last_scan = datetime.utcnow()
 
-    logger.info(f"[Scheduler] Starting scan for '{movie.name}' (id={movie.id}), manual={manual}")
+    logger.info(f"[Scheduler] Starting scan for '{movie.name}' (id={movie.id}), manual={manual}, send_whatsapp={send_whatsapp}")
 
     tasks = []
     if movie.bms_url:
@@ -60,12 +60,20 @@ async def scan_movie(movie: MovieConfig, manual: bool = False) -> None:
 
     # Send current status report if this is a manual trigger
     if manual and snapshots:
-        try:
-            from app.notifier.telegram import TelegramNotifier
-            tel_notifier = TelegramNotifier()
-            await tel_notifier.send_status_report(movie.name, snapshots)
-        except Exception as e:
-            logger.error(f"[Scheduler] Failed to send manual status report: {e}")
+        if send_whatsapp:
+            try:
+                from app.notifier.whatsapp import WhatsAppNotifier
+                wa_notifier = WhatsAppNotifier()
+                await wa_notifier.send_status_report(movie.name, snapshots)
+            except Exception as e:
+                logger.error(f"[Scheduler] Failed to send manual WhatsApp status report: {e}")
+        else:
+            try:
+                from app.notifier.telegram import TelegramNotifier
+                tel_notifier = TelegramNotifier()
+                await tel_notifier.send_status_report(movie.name, snapshots)
+            except Exception as e:
+                logger.error(f"[Scheduler] Failed to send manual status report: {e}")
 
     logger.info(f"[Scheduler] Scan complete for '{movie.name}'")
 

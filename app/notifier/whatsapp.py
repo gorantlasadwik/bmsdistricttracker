@@ -105,6 +105,91 @@ class WhatsAppNotifier(BaseNotifier):
 
         return success_count > 0
 
+    async def send_status_report(
+        self,
+        movie_name: str,
+        snapshots: list[SourceSnapshot],
+    ) -> bool:
+        instance_id = getattr(settings, "greenapi_instance_id", "") or ""
+        api_token   = getattr(settings, "greenapi_api_token",   "") or ""
+        recipient   = getattr(settings, "greenapi_recipient",   "") or ""
+
+        if not instance_id or not api_token or not recipient:
+            logger.warning("[WhatsApp] Green API credentials not set. Skipping status report.")
+            return False
+
+        if not snapshots:
+            return True
+
+        body = self._build_status_message(movie_name, snapshots)
+
+        # Green API endpoint
+        base_url = (settings.greenapi_api_url or "https://api.green-api.com").rstrip("/")
+        url = (
+            f"{base_url}/waInstance{instance_id}"
+            f"/sendMessage/{api_token}"
+        )
+        
+        # Split multiple recipients (comma-separated)
+        recipients = [r.strip() for r in recipient.split(",") if r.strip()]
+        if not recipients:
+            return False
+
+        success_count = 0
+        async with httpx.AsyncClient(timeout=20) as client:
+            for r in recipients:
+                # Clean up characters
+                clean_r = r.lstrip("+").replace(" ", "").replace("-", "")
+                if not clean_r.isdigit():
+                    continue
+                if len(clean_r) == 10:
+                    clean_r = f"91{clean_r}"
+
+                chat_id = f"{clean_r}@c.us"
+                payload = {
+                    "chatId": chat_id,
+                    "message": body,
+                }
+
+                try:
+                    resp = await client.post(url, json=payload)
+                    data = resp.json()
+                    if resp.status_code == 200 and data.get("idMessage"):
+                        logger.info(f"[WhatsApp] Status report sent to {clean_r} (id={data['idMessage']})")
+                        success_count += 1
+                except Exception as e:
+                    logger.error(f"[WhatsApp] Failed to send status report to {clean_r}: {e}")
+
+        return success_count > 0
+
+    def _build_status_message(
+        self,
+        movie_name: str,
+        snapshots: list[SourceSnapshot],
+    ) -> str:
+        lines = [f"📊 *{movie_name}* — Current Status Report\n"]
+
+        for snap in snapshots:
+            lines.append(f"📍 *{self._format_source_label(snap.source, snap.url)}*")
+            if not snap.theatres:
+                lines.append("  ⚠️ No theatres currently listing shows.")
+                lines.append("")
+                continue
+
+            for t in snap.theatres:
+                lines.append(f"  🏛 {t.theatre}")
+                status_lbl = "Booking Open" if t.booking_open else "Booking Not Open"
+                lines.append(f"    🟢 {status_lbl}" if t.booking_open else f"    🔴 {status_lbl}")
+                if t.shows:
+                    lines.append(f"    🕐 Shows: {', '.join(t.shows)}")
+                if t.formats:
+                    lines.append(f"    🎞 Formats: {', '.join(t.formats)}")
+                if t.booking_url:
+                    lines.append(f"    🔗 {t.booking_url}")
+                lines.append("")
+
+        return "\n".join(lines)
+
     def _build_message(
         self,
         movie_name: str,

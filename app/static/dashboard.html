@@ -170,6 +170,11 @@
       color: #fff;
     }
     .btn-scan:hover { opacity: .85; transform: scale(1.03); }
+    .btn-wa-status {
+      background: linear-gradient(135deg, #22c55e, #15803d);
+      color: #fff;
+    }
+    .btn-wa-status:hover { opacity: .85; transform: scale(1.03); }
     .btn-delete { background: rgba(239,68,68,.12); color: var(--red); border: 1px solid rgba(239,68,68,.2); }
     .btn-delete:hover { background: rgba(239,68,68,.2); }
 
@@ -452,6 +457,7 @@
           </div>
           <div class="movie-actions">
             <button class="btn btn-scan" onclick="triggerScan(${m.id}, '${esc(m.name)}')">⚡ Scan Now</button>
+            <button class="btn btn-wa-status" onclick="triggerScan(${m.id}, '${esc(m.name)}', true)">💬 WhatsApp Status</button>
             <button class="btn btn-delete" onclick="deleteMovie(${m.id}, '${esc(m.name)}')">✕</button>
           </div>
         </div>
@@ -530,10 +536,11 @@
     }
   }
 
-  async function triggerScan(id, name) {
+  async function triggerScan(id, name, whatsapp = false) {
     try {
-      await apiFetch(`/movies/${id}/scan`, { method: 'POST' });
-      toast(`⚡ Scan triggered for "${name}"`);
+      const query = whatsapp ? '?whatsapp=true' : '';
+      await apiFetch(`/movies/${id}/scan` + query, { method: 'POST' });
+      toast(whatsapp ? `💬 WhatsApp report triggered for "${name}"` : `⚡ Scan triggered for "${name}"`);
     } catch (e) {
       toast(e.message, 'error');
     }
