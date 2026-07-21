@@ -46,6 +46,19 @@ class ShowEntry(BaseModel):
         return re.sub(r"\s+", " ", v).strip()
 
 
+def normalize_theatre_key(name: str) -> str:
+    """
+    Canonical key for matching theatres reliably across minor string variations
+    (strips distance text, punctuation like colons/commas, and collapses whitespace).
+    """
+    if not name:
+        return ""
+    key = name.lower()
+    key = re.sub(r"\b\d+[\d\.\+]*\s*km(?:\s*away)?\b", "", key, flags=re.I)
+    key = re.sub(r"[^\w\s]", "", key)
+    return re.sub(r"\s+", " ", key).strip()
+
+
 class SourceSnapshot(BaseModel):
     """Complete parsed snapshot from one source (BMS or District) at a point in time."""
 
@@ -56,8 +69,8 @@ class SourceSnapshot(BaseModel):
     theatres: list[ShowEntry] = Field(default_factory=list)
 
     def theatre_map(self) -> dict[str, ShowEntry]:
-        """Return a dict keyed by theatre name for fast lookup."""
-        return {t.theatre.strip().lower(): t for t in self.theatres}
+        """Return a dict keyed by canonical theatre key for fast and bulletproof lookup."""
+        return {normalize_theatre_key(t.theatre): t for t in self.theatres}
 
 
 class ChangeType(str):
