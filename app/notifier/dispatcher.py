@@ -74,8 +74,8 @@ async def dispatch(
         f"via {[n.name for n in _notifiers]}"
     )
 
-    # ── Send via all enabled notifiers ─────────────────────────────────────────
-    for notifier in _notifiers:
+    # ── Send via all enabled notifiers concurrently ────────────────────────────
+    async def safe_send(notifier: BaseNotifier):
         try:
             success = await notifier.send(movie_name, new_changes, source_url)
             if success:
@@ -84,6 +84,12 @@ async def dispatch(
                 logger.warning(f"[{notifier.name.title()}] ✗ Failed")
         except Exception as e:
             logger.error(f"[{notifier.name.title()}] Unexpected error: {e}")
+
+    # Sort notifiers to prioritize whatsapp and initiate it first
+    sorted_notifiers = sorted(_notifiers, key=lambda n: 0 if n.name == "whatsapp" else 1)
+
+    import asyncio
+    await asyncio.gather(*(safe_send(notifier) for notifier in sorted_notifiers))
 
     # ── Record as sent ─────────────────────────────────────────────────────────
     for change in new_changes:
