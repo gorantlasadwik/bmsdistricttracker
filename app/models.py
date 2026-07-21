@@ -70,6 +70,15 @@ class ChangeEvent(BaseModel):
     detail: str
     """Human-readable description of what changed"""
 
+    before: str = ""
+    """Previous list/state string (e.g. '04:30 PM, 10:30 PM')"""
+
+    after: str = ""
+    """Updated list/state string (e.g. '04:30 PM, 10:30 AM, 10:30 PM')"""
+
+    new_items: list[str] = Field(default_factory=list)
+    """Newly added show times or items (e.g. ['10:30 AM'])"""
+
     booking_url: str | None = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 

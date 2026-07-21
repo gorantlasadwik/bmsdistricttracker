@@ -98,9 +98,41 @@ class TelegramNotifier(BaseNotifier):
                 lines.append(f"  🏛 *{_escape(theatre)}*")
 
                 for c in t_changes:
-                    icon = _ICON_MAP.get(c.type, "📌")
-                    detail = _escape(c.detail)
-                    lines.append(f"    {icon} {detail}")
+                    if c.type == "new_show":
+                        lines.append("    🚨 *NEW SHOW ADDED*")
+                        if c.before:
+                            lines.append(f"    • *Before:* {_escape(c.before)}")
+                        if c.after:
+                            after_formatted = _escape(c.after)
+                            if c.new_items:
+                                shows = [s.strip() for s in c.after.split(",")]
+                                highlighted = [f"__*{_escape(s)}*__" if s in c.new_items else _escape(s) for s in shows]
+                                after_formatted = ", ".join(highlighted)
+                            lines.append(f"    • *After:* {after_formatted}")
+                        else:
+                            lines.append(f"    • {_escape(c.detail)}")
+
+                    elif c.type == "new_theatre":
+                        lines.append("    🏛️ *NEW THEATRE ADDED*")
+                        if c.before:
+                            lines.append(f"    • *Before:* {_escape(c.before)}")
+                        if c.after:
+                            after_formatted = _escape(c.after)
+                            if c.new_items:
+                                shows = [s.strip() for s in c.after.split(",")]
+                                highlighted = [f"__*{_escape(s)}*__" if s in c.new_items else _escape(s) for s in shows]
+                                after_formatted = ", ".join(highlighted)
+                            lines.append(f"    • *After:* {after_formatted}")
+                        else:
+                            lines.append(f"    • {_escape(c.detail)}")
+
+                    elif c.type == "booking_open":
+                        lines.append("    🟢 *BOOKING OPEN!*")
+
+                    else:
+                        icon = _ICON_MAP.get(c.type, "📌")
+                        detail = _escape(c.detail)
+                        lines.append(f"    {icon} {detail}")
 
                 # Add booking link if available
                 booking_url = next(

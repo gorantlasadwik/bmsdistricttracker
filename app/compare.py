@@ -42,14 +42,15 @@ def diff_snapshots(
         entry = new_map[name_key]
         shows_str = ", ".join(sorted(entry.shows)) if entry.shows else "TBA"
         fmts_str = ", ".join(sorted(entry.formats_set())) if entry.formats else ""
-        detail = f"{entry.theatre} | Shows: {shows_str}"
-        if fmts_str:
-            detail += f" | Formats: {fmts_str}"
+        detail = f"New Theatre Added: {entry.theatre}"
         changes.append(ChangeEvent(
             type=ChangeType.NEW_THEATRE,
             source=new.source,
             theatre=entry.theatre,
             detail=detail,
+            before="Not Listed",
+            after=shows_str,
+            new_items=list(sorted(entry.shows)),
             booking_url=entry.booking_url,
         ))
 
@@ -84,14 +85,21 @@ def _diff_theatre(
 
     # ── New show times ─────────────────────────────────────────────────────────
     added_shows = new.shows_set() - old.shows_set()
-    for show_time in sorted(added_shows):
-        events.append(ChangeEvent(
-            type=ChangeType.NEW_SHOW,
-            source=source,
-            theatre=new.theatre,
-            detail=f"New show at {show_time}",
-            booking_url=new.booking_url,
-        ))
+    if added_shows:
+        before_str = ", ".join(sorted(old.shows)) if old.shows else "None"
+        after_str = ", ".join(sorted(new.shows)) if new.shows else "None"
+        added_list = sorted(added_shows)
+        for show_time in added_list:
+            events.append(ChangeEvent(
+                type=ChangeType.NEW_SHOW,
+                source=source,
+                theatre=new.theatre,
+                detail=f"New show at {show_time}",
+                before=before_str,
+                after=after_str,
+                new_items=added_list,
+                booking_url=new.booking_url,
+            ))
 
     # ── Removed show times (optional) ─────────────────────────────────────────
     if notify_removals:

@@ -23,7 +23,8 @@ from app.parsers.district import DistrictParser
 # Global scheduler instance (accessed by API for status checks)
 scheduler = AsyncIOScheduler(timezone="UTC")
 
-# Track active scans to prevent concurrent overlapping executions
+# Track last/next scan times and active scans
+_last_scan: datetime | None = None
 _active_scans: set[int] = set()
 _active_scans_lock = asyncio.Lock()
 _scan_lock = asyncio.Lock()
