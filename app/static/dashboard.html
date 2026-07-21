@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ShowPulser – Live Monitor Dashboard</title>
+  <meta name="description" content="ShowPulser real-time movie show monitoring dashboard. Track BookMyShow and District for new theatres, showtimes, and booking openings." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg:       #070b14;
+      --surface:  #0d1526;
+      --card:     #111827;
+      --border:   #1e2d45;
+      --accent:   #6366f1;
+      --accent2:  #8b5cf6;
+      --green:    #22c55e;
+      --yellow:   #f59e0b;
+      --red:      #ef4444;
+      --text:     #e2e8f0;
+      --muted:    #64748b;
+      --glow:     rgba(99,102,241,.25);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Animated background ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 60% 40% at 20% 20%, rgba(99,102,241,.12) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 35% at 80% 70%, rgba(139,92,246,.10) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .wrapper { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 0 20px 60px; }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 28px 0 32px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 36px;
+    }
+    .logo { display: flex; align-items: center; gap: 14px; }
+    .logo-icon {
+      width: 44px; height: 44px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+      box-shadow: 0 0 20px var(--glow);
+    }
+    .logo-text { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
+    .logo-text span { color: var(--accent); }
+    .logo-sub { font-size: 12px; color: var(--muted); font-weight: 400; margin-top: 2px; }
+
+    .pulse-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    .status-label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: .5; transform: scale(1.3); }
+    }
+
+    /* ── Stat cards ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 36px;
+    }
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 22px 24px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color .2s, transform .2s;
+    }
+    .stat-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+    }
+    .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+    .stat-value { font-size: 32px; font-weight: 800; letter-spacing: -1px; }
+    .stat-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .stat-icon { position: absolute; right: 20px; top: 20px; font-size: 28px; opacity: .15; }
+
+    /* ── Section headers ── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+    .section-title { font-size: 15px; font-weight: 700; letter-spacing: -.2px; }
+    .section-badge {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 3px 12px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    /* ── Movie cards ── */
+    .movies-grid { display: grid; gap: 16px; margin-bottom: 36px; }
+    .movie-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 22px 24px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      align-items: start;
+      transition: border-color .2s;
+    }
+    .movie-card:hover { border-color: var(--accent); }
+    .movie-name { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+    .movie-city { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+    .movie-urls { display: flex; gap: 8px; flex-wrap: wrap; }
+    .url-tag {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 3px 10px;
+      font-size: 11px;
+      color: var(--muted);
+      display: flex; align-items: center; gap: 5px;
+    }
+    .url-tag.bms { border-color: rgba(239,68,68,.3); color: #fca5a5; }
+    .url-tag.district { border-color: rgba(34,197,94,.3); color: #86efac; }
+    .movie-actions { display: flex; gap: 8px; }
+    .btn {
+      border: none; cursor: pointer;
+      border-radius: 8px; padding: 7px 14px;
+      font-size: 12px; font-weight: 600;
+      font-family: 'Inter', sans-serif;
+      transition: all .15s;
+    }
+    .btn-scan {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+    }
+    .btn-scan:hover { opacity: .85; transform: scale(1.03); }
+    .btn-delete { background: rgba(239,68,68,.12); color: var(--red); border: 1px solid rgba(239,68,68,.2); }
+    .btn-delete:hover { background: rgba(239,68,68,.2); }
+
+    /* ── Add movie form ── */
+    .add-card {
+      background: var(--card);
+      border: 1px dashed var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      margin-bottom: 36px;
+      transition: border-color .2s;
+    }
+    .add-card:hover { border-color: var(--accent); }
+    .add-card h3 { font-size: 14px; font-weight: 700; margin-bottom: 20px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+    .field label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .5px; }
+    .field input, .field select {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 9px 12px;
+      font-size: 13px;
+      font-family: 'Inter', sans-serif;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .field input:focus, .field select:focus { border-color: var(--accent); }
+    .field input::placeholder { color: var(--muted); }
+    .btn-add {
+      margin-top: 20px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 11px 28px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      transition: opacity .15s, transform .15s;
+    }
+    .btn-add:hover { opacity: .85; transform: scale(1.02); }
+
+    /* ── History timeline ── */
+    .history-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+    }
+    .timeline-item {
+      display: flex;
+      gap: 14px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .timeline-item:last-child { border-bottom: none; }
+    .timeline-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      margin-top: 4px;
+      flex-shrink: 0;
+    }
+    .dot-new_theatre  { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+    .dot-new_show     { background: var(--green); box-shadow: 0 0 6px var(--green); }
+    .dot-new_format   { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); }
+    .dot-booking_open { background: var(--green); box-shadow: 0 0 8px var(--green); }
+    .dot-show_removed, .dot-theatre_removed { background: var(--red); }
+    .timeline-body { flex: 1; }
+    .timeline-type { font-size: 12px; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: .5px; }
+    .timeline-time { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+    /* ── Alerts / toasts ── */
+    #toast {
+      position: fixed;
+      bottom: 28px; right: 28px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 20px;
+      font-size: 13px;
+      font-weight: 500;
+      box-shadow: 0 8px 32px rgba(0,0,0,.5);
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all .3s cubic-bezier(.4,0,.2,1);
+      z-index: 9999;
+      max-width: 320px;
+    }
+    #toast.show { transform: translateY(0); opacity: 1; }
+    #toast.success { border-color: rgba(34,197,94,.4); color: var(--green); }
+    #toast.error { border-color: rgba(239,68,68,.4); color: var(--red); }
+
+    /* ── Empty state ── */
+    .empty {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--muted);
+    }
+    .empty-icon { font-size: 48px; margin-bottom: 16px; }
+    .empty-text { font-size: 14px; }
+
+    /* ── Loading spinner ── */
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Responsive ── */
+    @media (max-width: 640px) {
+      header { flex-direction: column; align-items: flex-start; gap: 16px; }
+      .movie-card { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- ── Header ── -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🎬</div>
+      <div>
+        <div class="logo-text">Show<span>Pulser</span></div>
+        <div class="logo-sub">Live Movie Show Monitor</div>
+      </div>
+    </div>
+    <div class="status-label">
+      <div class="pulse-dot" id="statusDot"></div>
+      <span id="statusText">Connecting...</span>
+    </div>
+  </header>
+
+  <!-- ── Stat Cards ── -->
+  <div class="stats-grid" id="statsGrid">
+    <div class="stat-card">
+      <div class="stat-label">Active Movies</div>
+      <div class="stat-value" id="statMovies">—</div>
+      <div class="stat-icon">🎥</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Notifications Sent</div>
+      <div class="stat-value" id="statNotifs">—</div>
+      <div class="stat-icon">🔔</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Last Scan</div>
+      <div class="stat-value" style="font-size:16px;padding-top:6px" id="statLast">—</div>
+      <div class="stat-icon">⏱</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Next Scan</div>
+      <div class="stat-value" style="font-size:16px;padding-top:6px" id="statNext">—</div>
+      <div class="stat-icon">⏰</div>
+    </div>
+  </div>
+
+  <!-- ── Add Movie Form ── -->
+  <div class="add-card">
+    <h3>+ Monitor a New Movie</h3>
+    <div class="form-grid">
+      <div class="field">
+        <label>Movie Name</label>
+        <input type="text" id="fName" placeholder="Spider-Man: Brand New Day" />
+      </div>
+      <div class="field">
+        <label>City</label>
+        <input type="text" id="fCity" placeholder="Chennai" />
+      </div>
+      <div class="field">
+        <label>BookMyShow URL</label>
+        <input type="url" id="fBms" placeholder="https://in.bookmyshow.com/..." />
+      </div>
+      <div class="field">
+        <label>District URL</label>
+        <input type="url" id="fDistrict" placeholder="https://www.district.in/..." />
+      </div>
+      <div class="field">
+        <label>Scan Interval (seconds)</label>
+        <input type="number" id="fInterval" value="180" min="60" />
+      </div>
+    </div>
+    <button class="btn-add" onclick="addMovie()">Start Monitoring</button>
+  </div>
+
+  <!-- ── Active Movies ── -->
+  <div class="section-header">
+    <div class="section-title">Active Monitors</div>
+    <div class="section-badge" id="movieCount">Loading…</div>
+  </div>
+  <div class="movies-grid" id="moviesGrid">
+    <div class="empty"><div class="spinner"></div></div>
+  </div>
+
+  <!-- ── History ── -->
+  <div class="section-header" style="margin-top:36px">
+    <div class="section-title">Recent Activity</div>
+    <button class="btn btn-scan" onclick="loadHistory()" style="font-size:11px;padding:5px 12px">Refresh</button>
+  </div>
+  <div class="history-card" id="historyCard">
+    <div class="empty"><div class="spinner"></div></div>
+  </div>
+
+</div>
+
+<!-- ── Toast ── -->
+<div id="toast"></div>
+
+<script>
+  const API = '';  // Same origin
+
+  // ── Toast ─────────────────────────────────────────────────────────────────
+  let toastTimer;
+  function toast(msg, type = 'success') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = `show ${type}`;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.className = '', 3500);
+  }
+
+  // ── Fetch helpers ─────────────────────────────────────────────────────────
+  async function apiFetch(path, opts = {}) {
+    const r = await fetch(API + path, opts);
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.detail || r.statusText);
+    }
+    return r.json();
+  }
+
+  // ── Status ────────────────────────────────────────────────────────────────
+  async function loadStatus() {
+    try {
+      const s = await apiFetch('/status');
+      document.getElementById('statusDot').style.background = s.running ? 'var(--green)' : 'var(--red)';
+      document.getElementById('statusText').textContent = s.running ? 'Scheduler Running' : 'Stopped';
+      document.getElementById('statMovies').textContent = s.active_movies;
+      document.getElementById('statNotifs').textContent = s.total_notifications_sent;
+      document.getElementById('statLast').textContent = s.last_scan ? fmtTime(s.last_scan) : 'Never';
+      document.getElementById('statNext').textContent = s.next_scan ? fmtTime(s.next_scan) : '—';
+    } catch (e) {
+      document.getElementById('statusText').textContent = 'Offline';
+      document.getElementById('statusDot').style.background = 'var(--red)';
+    }
+  }
+
+  // ── Movies ────────────────────────────────────────────────────────────────
+  async function loadMovies() {
+    try {
+      const data = await apiFetch('/movies');
+      const movies = data.movies || [];
+      document.getElementById('movieCount').textContent = `${movies.length} active`;
+      const grid = document.getElementById('moviesGrid');
+
+      if (!movies.length) {
+        grid.innerHTML = `<div class="empty">
+          <div class="empty-icon">🎥</div>
+          <div class="empty-text">No movies being monitored yet.<br>Add one above to get started.</div>
+        </div>`;
+        return;
+      }
+
+      grid.innerHTML = movies.map(m => `
+        <div class="movie-card" id="movie-${m.id}">
+          <div>
+            <div class="movie-name">${esc(m.name)}</div>
+            <div class="movie-city">${esc(m.city || 'City not set')} &nbsp;•&nbsp; Scan every ${m.interval}s</div>
+            <div class="movie-urls">
+              ${m.bms_url ? `<div class="url-tag bms">🎟 BookMyShow</div>` : ''}
+              ${m.district_url ? `<div class="url-tag district">🎫 District</div>` : ''}
+            </div>
+          </div>
+          <div class="movie-actions">
+            <button class="btn btn-scan" onclick="triggerScan(${m.id}, '${esc(m.name)}')">⚡ Scan Now</button>
+            <button class="btn btn-delete" onclick="deleteMovie(${m.id}, '${esc(m.name)}')">✕</button>
+          </div>
+        </div>
+      `).join('');
+    } catch (e) {
+      document.getElementById('moviesGrid').innerHTML = `<div class="empty"><div class="empty-text">Failed to load movies: ${e.message}</div></div>`;
+    }
+  }
+
+  // ── History ───────────────────────────────────────────────────────────────
+  async function loadHistory() {
+    const card = document.getElementById('historyCard');
+    card.innerHTML = '<div class="empty"><div class="spinner"></div></div>';
+    try {
+      const data = await apiFetch('/movies');
+      const movies = data.movies || [];
+      const allHistory = [];
+
+      for (const m of movies.slice(0, 5)) {
+        const h = await apiFetch(`/movies/${m.id}/history?limit=10`).catch(() => ({ history: [] }));
+        (h.history || []).forEach(item => allHistory.push({ ...item, movie: m.name }));
+      }
+
+      allHistory.sort((a, b) => new Date(b.sent_at) - new Date(a.sent_at));
+
+      if (!allHistory.length) {
+        card.innerHTML = `<div class="empty">
+          <div class="empty-icon">📭</div>
+          <div class="empty-text">No notifications sent yet.<br>Trigger a scan to see activity here.</div>
+        </div>`;
+        return;
+      }
+
+      card.innerHTML = allHistory.slice(0, 30).map(item => `
+        <div class="timeline-item">
+          <div class="timeline-dot dot-${item.change_type}"></div>
+          <div class="timeline-body">
+            <div class="timeline-type">${fmtType(item.change_type)} &nbsp;—&nbsp; ${esc(item.movie)}</div>
+            <div class="timeline-time">${fmtTime(item.sent_at)}</div>
+          </div>
+        </div>
+      `).join('');
+    } catch (e) {
+      card.innerHTML = `<div class="empty"><div class="empty-text">Could not load history.</div></div>`;
+    }
+  }
+
+  // ── Actions ───────────────────────────────────────────────────────────────
+  async function addMovie() {
+    const name = document.getElementById('fName').value.trim();
+    const bmsUrl = document.getElementById('fBms').value.trim();
+    const districtUrl = document.getElementById('fDistrict').value.trim();
+    if (!name || (!bmsUrl && !districtUrl)) {
+      toast('Enter a movie name and at least one URL.', 'error');
+      return;
+    }
+    try {
+      await apiFetch('/movies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          city: document.getElementById('fCity').value.trim(),
+          bms_url: bmsUrl,
+          district_url: districtUrl,
+          interval: parseInt(document.getElementById('fInterval').value) || 180,
+        }),
+      });
+      toast(`✓ Now monitoring "${name}"`);
+      ['fName','fCity','fBms','fDistrict'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('fInterval').value = '180';
+      await loadMovies();
+      await loadStatus();
+    } catch (e) {
+      toast(e.message, 'error');
+    }
+  }
+
+  async function triggerScan(id, name) {
+    try {
+      await apiFetch(`/movies/${id}/scan`, { method: 'POST' });
+      toast(`⚡ Scan triggered for "${name}"`);
+    } catch (e) {
+      toast(e.message, 'error');
+    }
+  }
+
+  async function deleteMovie(id, name) {
+    if (!confirm(`Stop monitoring "${name}"?`)) return;
+    try {
+      await apiFetch(`/movies/${id}`, { method: 'DELETE' });
+      toast(`Stopped monitoring "${name}"`);
+      await loadMovies();
+      await loadStatus();
+    } catch (e) {
+      toast(e.message, 'error');
+    }
+  }
+
+  // ── Formatters ────────────────────────────────────────────────────────────
+  function fmtTime(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso + (iso.endsWith('Z') ? '' : 'Z'));
+    const now = new Date();
+    const diff = Math.round((now - d) / 1000);
+    if (diff < 60) return `${diff}s ago`;
+    if (diff < 3600) return `${Math.round(diff/60)}m ago`;
+    if (diff < 86400) return `${Math.round(diff/3600)}h ago`;
+    return d.toLocaleDateString('en-IN', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+  }
+
+  function fmtType(t) {
+    return (t || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── Init & polling ─────────────────────────────────────────────────────────
+  async function init() {
+    await Promise.all([loadStatus(), loadMovies(), loadHistory()]);
+    // Auto-refresh every 30 seconds
+    setInterval(async () => {
+      await loadStatus();
+      await loadMovies();
+    }, 30_000);
+    // History refresh every 60 seconds
+    setInterval(loadHistory, 60_000);
+  }
+
+  init();
+</script>
+</body>
+</html>

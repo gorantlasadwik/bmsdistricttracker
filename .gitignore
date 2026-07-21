@@ -1,0 +1,26 @@
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.venv/
+venv/
+
+# Environment files
+.env
+.env.example
+
+# Local SQLite databases
+data/
+*.db
+*.db-journal
+*.db-wal
+
+# Snapshots and temporary debug HTMLs
+snapshots/
+debug_html/
+
+# Log files
+logs/
+*.log

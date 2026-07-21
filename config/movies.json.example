@@ -1,0 +1,12 @@
+{
+  "movies": [
+    {
+      "name": "Spider-Man: Brand New Day",
+      "city": "Chennai",
+      "bms_url": "https://in.bookmyshow.com/chennai/movies/spider-man-brand-new-day/ET00XXXXXX",
+      "district_url": "https://www.district.in/events/spider-man-brand-new-day-XXXXXXXX",
+      "interval": 180
+    }
+  ],
+  "_comment": "This file is for reference only. Use the POST /movies API or the dashboard to add movies."
+}
