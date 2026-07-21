@@ -19,7 +19,7 @@ import httpx
 from loguru import logger
 
 from app.config import settings
-from app.models import ChangeEvent
+from app.models import ChangeEvent, SourceSnapshot
 from app.notifier.base import BaseNotifier
 
 

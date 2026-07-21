@@ -15,7 +15,7 @@ from loguru import logger
 from app import database as db
 from app.browser import browser_pool
 from app.compare import diff_snapshots, summarise_changes
-from app.models import MovieConfig
+from app.models import MovieConfig, SourceSnapshot
 from app.notifier.dispatcher import dispatch
 from app.parsers.bms import BookMyShowParser
 from app.parsers.district import DistrictParser
