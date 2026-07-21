@@ -161,6 +161,17 @@ class BrowserPool:
         """Convenience wrapper: create a context + page and close both after use."""
         async with self.new_context() as context:
             page = await context.new_page()
+            
+            # Save memory and CPU by blocking heavy and tracking assets
+            await page.route("**/*", lambda route: 
+                route.abort() if route.request.resource_type in ("image", "media", "font") or 
+                any(track in route.request.url.lower() for track in (
+                    "analytics", "facebook", "doubleclick", "google-analytics", "tagmanager", 
+                    "adservice", "stats", "hotjar", "mixpanel", "sentry", "amplitude"
+                ))
+                else route.continue_()
+            )
+
             try:
                 yield page
             finally:
