@@ -37,6 +37,29 @@ logger.add(
 _START_TIME = time.time()
 
 
+import os
+import httpx
+import asyncio
+
+async def self_pinger():
+    url = os.environ.get("RENDER_EXTERNAL_URL") or os.environ.get("EXTERNAL_URL")
+    if not url:
+        logger.info("[Pinger] RENDER_EXTERNAL_URL not set. Self-pinger disabled (normal for local runs).")
+        return
+    
+    health_url = f"{url.rstrip('/')}/health"
+    logger.info(f"[Pinger] Starting self-pinger task targeting: {health_url}")
+    
+    while True:
+        await asyncio.sleep(600)  # Ping every 10 minutes
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(health_url)
+                logger.info(f"[Pinger] Self-ping status: {resp.status_code}")
+        except Exception as e:
+            logger.error(f"[Pinger] Self-ping failed: {e}")
+
+
 # ── Lifespan ───────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -47,6 +70,9 @@ async def lifespan(app: FastAPI):
     await db.init_db()
     await browser_pool.start()
     await sched.start_scheduler()
+    
+    # Start self-pinger background task
+    pinger_task = asyncio.create_task(self_pinger())
 
     logger.info("ShowPulser is running ✓")
     logger.info("=" * 60)
@@ -54,6 +80,7 @@ async def lifespan(app: FastAPI):
     yield
 
     logger.info("ShowPulser shutting down...")
+    pinger_task.cancel()
     await sched.stop_scheduler()
     await browser_pool.stop()
     logger.info("ShowPulser stopped.")
