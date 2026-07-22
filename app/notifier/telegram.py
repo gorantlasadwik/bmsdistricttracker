@@ -184,20 +184,21 @@ class TelegramNotifier(BaseNotifier):
         snapshots: list[SourceSnapshot],
     ) -> str:
         lines: list[str] = []
-        safe_name = _escape(movie_name)
-        lines.append(f"📊 *{safe_name} — Current Status Report*")
+        safe_header = _escape(f"{movie_name} — Current Status Report")
+        lines.append(f"📊 *{safe_header}*")
         lines.append("")
 
         for snap in snapshots:
             src_icon = _SOURCE_ICON.get(snap.source, "📽")
-            src_label = _escape(self._format_source_label(snap.source))
+            raw_label = self._format_source_label(snap.source, snap.url)
+            src_label = _escape(raw_label)
             lines.append(f"{src_icon} *{src_label}*")
             if snap.url:
                 lines.append(f"🌐 [View Link]({_escape_url(snap.url)})")
             lines.append("")
 
             if not snap.theatres:
-                lines.append("  ⚠️ _No theatres currently listing shows._")
+                lines.append("  ⚠️ _No theatres currently listing shows\\._")
                 lines.append("")
                 continue
 
@@ -205,7 +206,7 @@ class TelegramNotifier(BaseNotifier):
                 lines.append(f"  🏛 *{_escape(t.theatre)}*")
                 status_icon = "🟢" if t.booking_open else "🔴"
                 status_lbl = "Booking Open" if t.booking_open else "Booking Not Open"
-                lines.append(f"    {status_icon} {status_lbl}")
+                lines.append(f"    {status_icon} {_escape(status_lbl)}")
                 if t.shows:
                     lines.append(f"    🕐 Shows: {_escape(', '.join(t.shows))}")
                 if t.formats:
