@@ -107,78 +107,119 @@ class BookMyShowParser(BaseParser):
 
         theatres: list[ShowEntry] = []
 
+        # Strategy 1A: Parse showtimesFunctionalApi (New RTK Query format)
         try:
-            stbe = state.get("showtimesByEvent", {})
-            show_dates = stbe.get("showDates", {})
-            if not show_dates:
-                return SourceSnapshot(source="bookmyshow", movie_name=movie_name, url=url, theatres=[])
+            sfa = state.get("showtimesFunctionalApi", {})
+            queries = sfa.get("queries", {})
+            for qk, qv in queries.items():
+                if "fetchPrimaryDynamic" in qk or "fetchStaticShowtimes" in qk:
+                    idata = qv.get("data", {}).get("data", {})
+                    widgets = idata.get("showtimeWidgets", [])
+                    for w in widgets:
+                        if w.get("type") == "groupList":
+                            for g in w.get("data", []):
+                                for card in g.get("data", []):
+                                    if card.get("type") == "venue-card":
+                                        add_data = card.get("additionalData", {})
+                                        name = add_data.get("venueName") or card.get("title") or ""
+                                        name = name.strip()
+                                        if not name or len(name) < 3:
+                                            continue
 
-            # Process all available dates
-            for date_key, date_data in show_dates.items():
-                # Static venue names
-                static_venues: dict = (
-                    date_data.get("primaryStatic", {})
-                    .get("data", {})
-                    .get("venues", {})
-                )
+                                        raw_shows = []
+                                        if "showtimes" in card and isinstance(card["showtimes"], list):
+                                            raw_shows.extend(card["showtimes"])
+                                        if "showtimesSections" in card and isinstance(card["showtimesSections"], list):
+                                            for sec in card["showtimesSections"]:
+                                                if isinstance(sec, dict) and "showtimes" in sec:
+                                                    raw_shows.extend(sec["showtimes"])
 
-                # Dynamic showtime widgets
-                dynamic_widgets = (
-                    date_data.get("dynamic", {})
-                    .get("data", {})
-                    .get("showtimeWidgets", [])
-                )
+                                        shows: list[str] = []
+                                        formats: set[str] = set()
 
-                # Find groupList widget
-                gl_widget = next(
-                    (w for w in dynamic_widgets if w.get("type") == "groupList"),
-                    None
-                )
-                if not gl_widget:
-                    continue
+                                        for st_item in raw_shows:
+                                            title = (
+                                                st_item.get("title")
+                                                or st_item.get("additionalData", {}).get("showTime")
+                                                or ""
+                                            ).strip()
+                                            if title:
+                                                shows.append(title)
+                                            screen_attr = (
+                                                st_item.get("screenAttr")
+                                                or st_item.get("additionalData", {}).get("attributes")
+                                                or ""
+                                            ).strip()
+                                            for fmt in _extract_formats(screen_attr):
+                                                formats.add(fmt)
 
-                # Each item in gl_widget["data"] is a venueGroup
-                for group in gl_widget.get("data", []):
-                    for card in group.get("data", []):
-                        if card.get("type") != "venue-card":
-                            continue
+                                        url_fmt = _format_from_url(url)
+                                        if url_fmt:
+                                            formats.add(url_fmt)
 
-                        venue_code = card.get("additionalData", {}).get("venueCode", "")
-                        # Venue name from static data
-                        name = static_venues.get(venue_code, {}).get("venueName", "").strip()
-                        if not name or len(name) < 3:
-                            continue
-
-                        # Shows
-                        raw_shows = card.get("showtimes", [])
-                        shows: list[str] = []
-                        formats: set[str] = set()
-
-                        for st in raw_shows:
-                            title = st.get("title", "").strip()  # e.g. "03:20 PM"
-                            if title:
-                                shows.append(title)
-                            screen_attr = st.get("screenAttr", "").strip()  # e.g. "SC 1 DOLBY ATMOS"
-                            for fmt in _extract_formats(screen_attr):
-                                formats.add(fmt)
-
-                        booking_open = bool(shows)
-
-                        # Format hint from URL
-                        url_fmt = _format_from_url(url)
-                        if url_fmt:
-                            formats.add(url_fmt)
-
-                        theatres.append(ShowEntry(
-                            theatre=name,
-                            shows=sorted(set(shows)),
-                            formats=sorted(formats),
-                            booking_open=booking_open,
-                            booking_url=url if booking_open else None,
-                        ))
-
+                                        booking_open = bool(shows)
+                                        theatres.append(ShowEntry(
+                                            theatre=name,
+                                            shows=shows,
+                                            formats=sorted(formats),
+                                            booking_open=booking_open,
+                                            booking_url=url if booking_open else None,
+                                        ))
         except Exception as e:
-            logger.warning(f"[BMS] Error walking __INITIAL_STATE__: {e}")
+            logger.warning(f"[BMS] Error parsing showtimesFunctionalApi: {e}")
+
+        # Strategy 1B: Fallback to showtimesByEvent (Legacy format) if empty
+        if not theatres:
+            try:
+                stbe = state.get("showtimesByEvent", {})
+                show_dates = stbe.get("showDates", {})
+                for date_key, date_data in show_dates.items():
+                    static_venues: dict = (
+                        date_data.get("primaryStatic", {})
+                        .get("data", {})
+                        .get("venues", {})
+                    )
+                    dynamic_widgets = (
+                        date_data.get("dynamic", {})
+                        .get("data", {})
+                        .get("showtimeWidgets", [])
+                    )
+                    gl_widget = next(
+                        (w for w in dynamic_widgets if w.get("type") == "groupList"),
+                        None
+                    )
+                    if not gl_widget:
+                        continue
+                    for group in gl_widget.get("data", []):
+                        for card in group.get("data", []):
+                            if card.get("type") != "venue-card":
+                                continue
+                            venue_code = card.get("additionalData", {}).get("venueCode", "")
+                            name = static_venues.get(venue_code, {}).get("venueName", "").strip()
+                            if not name or len(name) < 3:
+                                continue
+                            raw_shows = card.get("showtimes", [])
+                            shows: list[str] = []
+                            formats: set[str] = set()
+                            for st in raw_shows:
+                                title = st.get("title", "").strip()
+                                if title:
+                                    shows.append(title)
+                                screen_attr = st.get("screenAttr", "").strip()
+                                for fmt in _extract_formats(screen_attr):
+                                    formats.add(fmt)
+                            url_fmt = _format_from_url(url)
+                            if url_fmt:
+                                formats.add(url_fmt)
+                            theatres.append(ShowEntry(
+                                theatre=name,
+                                shows=shows,
+                                formats=sorted(formats),
+                                booking_open=bool(shows),
+                                booking_url=url if bool(shows) else None,
+                            ))
+            except Exception as e:
+                logger.warning(f"[BMS] Error walking showtimesByEvent: {e}")
 
         logger.info(f"[BMS JSON] Parsed {len(theatres)} theatre(s)")
         return SourceSnapshot(source="bookmyshow", movie_name=movie_name, url=url, theatres=theatres)
