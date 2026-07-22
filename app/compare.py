@@ -6,12 +6,13 @@ This is a pure function with no side effects — easy to unit test.
 """
 from __future__ import annotations
 
-from app.models import ChangeEvent, ChangeType, ShowEntry, SourceSnapshot
+from app.models import ChangeEvent, ChangeType, ShowEntry, SourceSnapshot, normalize_theatre_key
 
 
 def diff_snapshots(
     old: SourceSnapshot | None,
     new: SourceSnapshot,
+    known_theatre_keys: set[str] | None = None,
     notify_removals: bool = False,
 ) -> list[ChangeEvent]:
     """
@@ -20,6 +21,7 @@ def diff_snapshots(
     Args:
         old: Previously stored snapshot (None if first run).
         new: Freshly fetched snapshot.
+        known_theatre_keys: Optional set of canonical theatre keys ever recorded in DB history.
         notify_removals: If True, also emit events for removed shows/theatres.
 
     Returns:
@@ -40,6 +42,12 @@ def diff_snapshots(
     # ── New Theatres ───────────────────────────────────────────────────────────
     for name_key in new_names - old_names:
         entry = new_map[name_key]
+        canon_key = normalize_theatre_key(entry.theatre)
+
+        # Check if theatre was EVER seen before in DB history (prevents glitch alerts)
+        if known_theatre_keys and canon_key in known_theatre_keys:
+            continue
+
         shows_str = ", ".join(sorted(entry.shows)) if entry.shows else "TBA"
         fmts_str = ", ".join(sorted(entry.formats_set())) if entry.formats else ""
         detail = f"New Theatre Added: {entry.theatre}"

@@ -66,6 +66,20 @@ CREATE TABLE IF NOT EXISTS scan_log (
 )
 """
 
+_CREATE_KNOWN_THEATRES = """
+CREATE TABLE IF NOT EXISTS known_theatres (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    movie_id    INTEGER NOT NULL,
+    source      TEXT NOT NULL,
+    theatre_key TEXT NOT NULL,
+    theatre_name TEXT NOT NULL,
+    first_seen  TEXT NOT NULL,
+    last_seen   TEXT NOT NULL,
+    UNIQUE(movie_id, source, theatre_key),
+    FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE
+)
+"""
+
 
 async def init_db() -> None:
     """Create all tables if they don't exist."""
@@ -76,6 +90,7 @@ async def init_db() -> None:
         await db.execute(_CREATE_SNAPSHOTS)
         await db.execute(_CREATE_NOTIFICATIONS)
         await db.execute(_CREATE_SCAN_LOG)
+        await db.execute(_CREATE_KNOWN_THEATRES)
         await db.commit()
     logger.info(f"Database initialised at {DB_PATH}")
     await _auto_seed()
@@ -190,6 +205,40 @@ async def get_last_snapshot(movie_id: int, source: str) -> SourceSnapshot | None
     if row:
         return SourceSnapshot.model_validate_json(row[0])
     return None
+
+
+async def get_known_theatre_keys(movie_id: int, source: str) -> set[str]:
+    """Return set of all canonical theatre keys ever recorded for a movie and source."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT theatre_key FROM known_theatres WHERE movie_id=? AND source=?",
+            (movie_id, source),
+        ) as cursor:
+            rows = await cursor.fetchall()
+    return {r[0] for r in rows}
+
+
+async def update_known_theatres(movie_id: int, source: str, theatres: list[ShowEntry]) -> None:
+    """Upsert list of parsed theatres into known_theatres table."""
+    if not theatres:
+        return
+
+    from app.models import normalize_theatre_key
+    now_iso = datetime.utcnow().isoformat()
+    async with aiosqlite.connect(DB_PATH) as db:
+        for t in theatres:
+            key = normalize_theatre_key(t.theatre)
+            if not key:
+                continue
+            await db.execute(
+                """INSERT INTO known_theatres (movie_id, source, theatre_key, theatre_name, first_seen, last_seen)
+                   VALUES (?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(movie_id, source, theatre_key) DO UPDATE SET
+                       last_seen = excluded.last_seen,
+                       theatre_name = excluded.theatre_name""",
+                (movie_id, source, key, t.theatre, now_iso, now_iso),
+            )
+        await db.commit()
 
 
 # ── Notification dedup ─────────────────────────────────────────────────────────

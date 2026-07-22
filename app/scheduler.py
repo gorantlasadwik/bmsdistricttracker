@@ -108,11 +108,12 @@ async def _scan_source(movie: MovieConfig, parser, url: str) -> SourceSnapshot |
             f"[Scheduler] Fetched {len(snapshot.theatres)} theatre(s) from {source} for '{movie.name}'"
         )
 
-        # Load previous snapshot for comparison
+        # Load previous snapshot and known theatres history for comparison
         old_snapshot = await db.get_last_snapshot(movie.id, source)
+        known_keys = await db.get_known_theatre_keys(movie.id, source)
 
-        # Diff
-        changes = diff_snapshots(old_snapshot, snapshot)
+        # Diff against last snapshot and historical known theatres
+        changes = diff_snapshots(old_snapshot, snapshot, known_theatre_keys=known_keys)
 
         if changes:
             summary = summarise_changes(changes)
@@ -129,8 +130,20 @@ async def _scan_source(movie: MovieConfig, parser, url: str) -> SourceSnapshot |
         else:
             logger.debug(f"[Scheduler] No changes for '{movie.name}' on {source}.")
 
-        # Save new snapshot
-        await db.save_snapshot(movie.id, snapshot)
+        # Always update the known_theatres history table with parsed theatres
+        if snapshot.theatres:
+            await db.update_known_theatres(movie.id, source, snapshot.theatres)
+
+        # Guard against temporary empty load glitches
+        if not snapshot.theatres and old_snapshot and old_snapshot.theatres:
+            logger.warning(
+                f"[Scheduler] '{movie.name}' on {source} returned 0 theatres (previous: {len(old_snapshot.theatres)}). "
+                "Skipping snapshot overwrite to preserve baseline."
+            )
+        else:
+            # Save new snapshot
+            await db.save_snapshot(movie.id, snapshot)
+
         await db.log_scan_end(log_id, "success")
         return snapshot
 

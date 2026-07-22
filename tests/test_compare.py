@@ -45,6 +45,19 @@ def test_distance_suffix_ignored():
     assert changes == []
 
 
+def test_known_theatres_prevents_false_new_theatre_alert():
+    """If a theatre was dropped temporarily and reappears, known_theatre_keys suppresses the alert."""
+    old = make_snapshot([{"theatre": "PVR Palazzo", "shows": ["09:00"], "formats": [], "language": "", "booking_open": True}])
+    new = make_snapshot([
+        {"theatre": "PVR Palazzo", "shows": ["09:00"], "formats": [], "language": "", "booking_open": True},
+        {"theatre": "MovieMax PR Mall", "shows": ["10:30"], "formats": [], "language": "", "booking_open": True},
+    ])
+    known_keys = {"moviemax pr mall"}
+    changes = diff_snapshots(old, new, known_theatre_keys=known_keys)
+    new_theatre_events = [c for c in changes if c.type == "new_theatre"]
+    assert len(new_theatre_events) == 0
+
+
 def test_first_run_returns_empty():
     """First run (old=None) should not trigger notifications."""
     new = make_snapshot([{"theatre": "AGS", "shows": ["09:00"], "formats": [], "language": "Tamil", "booking_open": False}])
