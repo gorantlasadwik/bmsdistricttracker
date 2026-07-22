@@ -96,14 +96,10 @@ class DistrictParser(BaseParser):
         async with browser_pool.new_page() as page:
             page.on("response", on_response)
             try:
-                await page.goto(url, wait_until="domcontentloaded", timeout=45_000)
-                await asyncio.sleep(4)
-                await page.wait_for_load_state("networkidle", timeout=12_000)
+                await page.goto(url, wait_until="domcontentloaded", timeout=30_000)
+                await asyncio.sleep(2.5)
             except Exception as e:
                 logger.debug(f"[District] Load warning: {e}")
-            await asyncio.sleep(1)
-            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            await asyncio.sleep(1)
             html = await page.content()
 
         if intercepted:

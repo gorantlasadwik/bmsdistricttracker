@@ -50,14 +50,10 @@ class BookMyShowParser(BaseParser):
 
         async with browser_pool.new_page() as page:
             try:
-                await page.goto(url, wait_until="domcontentloaded", timeout=45_000)
-                await asyncio.sleep(4)
-                await page.wait_for_load_state("networkidle", timeout=12_000)
+                await page.goto(url, wait_until="domcontentloaded", timeout=30_000)
+                await asyncio.sleep(2.5)
             except Exception as e:
                 logger.debug(f"[BMS] Load warning: {e}")
-            await asyncio.sleep(1)
-            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            await asyncio.sleep(1)
             html = await page.content()
 
         # Strategy 1: parse __INITIAL_STATE__ JSON
