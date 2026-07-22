@@ -76,6 +76,16 @@ def test_new_show_detected():
     assert "15:45" in show_events[0].detail
 
 
+def test_duplicate_same_time_show_detected():
+    """Detects when an additional screen/slot is added at the exact same show time."""
+    old = make_snapshot([{"theatre": "PVR", "shows": ["04:30 PM"], "formats": [], "language": "", "booking_open": True}])
+    new = make_snapshot([{"theatre": "PVR", "shows": ["04:30 PM", "04:30 PM"], "formats": [], "language": "", "booking_open": True}])
+    changes = diff_snapshots(old, new)
+    show_events = [c for c in changes if c.type == "new_show"]
+    assert len(show_events) == 1
+    assert "04:30 PM" in show_events[0].detail
+
+
 def test_multiple_new_shows():
     old = make_snapshot([{"theatre": "PVR", "shows": ["09:00"], "formats": [], "language": "", "booking_open": False}])
     new = make_snapshot([{"theatre": "PVR", "shows": ["09:00", "12:00", "15:00", "18:00"], "formats": [], "language": "", "booking_open": False}])

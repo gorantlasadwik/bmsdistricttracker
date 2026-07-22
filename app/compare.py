@@ -91,12 +91,17 @@ def _diff_theatre(
 ) -> list[ChangeEvent]:
     events: list[ChangeEvent] = []
 
-    # ── New show times ─────────────────────────────────────────────────────────
-    added_shows = new.shows_set() - old.shows_set()
-    if added_shows:
+    # ── New show times (using Counter multiset diff to support multiple shows at same time) ──
+    from collections import Counter
+    old_counts = Counter(old.shows)
+    new_counts = Counter(new.shows)
+    added_counts = new_counts - old_counts
+
+    if added_counts:
         before_str = ", ".join(sorted(old.shows)) if old.shows else "None"
         after_str = ", ".join(sorted(new.shows)) if new.shows else "None"
-        added_list = sorted(added_shows)
+        added_list = sorted(list(added_counts.elements()))
+        unique_added = sorted(list(set(added_list)))
         for show_time in added_list:
             events.append(ChangeEvent(
                 type=ChangeType.NEW_SHOW,
@@ -105,14 +110,14 @@ def _diff_theatre(
                 detail=f"New show at {show_time}",
                 before=before_str,
                 after=after_str,
-                new_items=added_list,
+                new_items=unique_added,
                 booking_url=new.booking_url,
             ))
 
     # ── Removed show times (optional) ─────────────────────────────────────────
     if notify_removals:
-        removed_shows = old.shows_set() - new.shows_set()
-        for show_time in sorted(removed_shows):
+        removed_counts = old_counts - new_counts
+        for show_time in sorted(list(removed_counts.elements())):
             events.append(ChangeEvent(
                 type=ChangeType.SHOW_REMOVED,
                 source=source,
