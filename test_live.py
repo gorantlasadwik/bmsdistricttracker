@@ -12,6 +12,9 @@ from pathlib import Path
 # Allow running from project root
 sys.path.insert(0, str(Path(__file__).parent))
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
 from app.browser import browser_pool
 from app.parsers.bms import BookMyShowParser
 from app.parsers.district import DistrictParser

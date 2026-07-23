@@ -80,39 +80,60 @@ class BrowserPool:
         self._page_count: int = 0
         self._lock = asyncio.Lock()
 
+    async def _stop_internal(self) -> None:
+        if self._browser:
+            try:
+                await self._browser.close()
+            except Exception:
+                pass
+            self._browser = None
+        if self._playwright:
+            try:
+                await self._playwright.stop()
+            except Exception:
+                pass
+            self._playwright = None
+        gc.collect()
+
     async def start(self) -> None:
         async with self._lock:
             if self._browser and self._browser.is_connected():
                 return
 
             logger.info("[BrowserPool] Starting low-memory Chromium browser instance...")
-            if not self._playwright:
+            await self._stop_internal()
+
+            try:
                 self._playwright = await async_playwright().start()
 
-            # Detect executable path if not found yet
-            if not self._executable_path:
-                try:
-                    self._browser = await self._playwright.chromium.launch(
-                        headless=True,
-                        args=_STEALTH_ARGS,
-                    )
-                    logger.info("[BrowserPool] Browser ready (Playwright Chromium).")
-                    return
-                except Exception as e:
-                    logger.warning(f"[BrowserPool] Playwright Chromium fallback: {e}")
+                if not self._executable_path:
+                    try:
+                        self._browser = await self._playwright.chromium.launch(
+                            headless=True,
+                            args=_STEALTH_ARGS,
+                        )
+                        self._page_count = 0
+                        logger.info("[BrowserPool] Browser ready (Playwright Chromium).")
+                        return
+                    except Exception as e:
+                        logger.warning(f"[BrowserPool] Playwright Chromium fallback needed: {e}")
 
-                for path in _SYSTEM_CHROME_PATHS:
-                    if os.path.exists(path):
-                        self._executable_path = path
-                        break
+                    for path in _SYSTEM_CHROME_PATHS:
+                        if os.path.exists(path):
+                            self._executable_path = path
+                            break
 
-            launch_kwargs: dict = {"headless": True, "args": _STEALTH_ARGS}
-            if self._executable_path:
-                launch_kwargs["executable_path"] = self._executable_path
+                launch_kwargs: dict = {"headless": True, "args": _STEALTH_ARGS}
+                if self._executable_path:
+                    launch_kwargs["executable_path"] = self._executable_path
 
-            self._browser = await self._playwright.chromium.launch(**launch_kwargs)
-            self._page_count = 0
-            logger.info("[BrowserPool] Browser ready.")
+                self._browser = await self._playwright.chromium.launch(**launch_kwargs)
+                self._page_count = 0
+                logger.info("[BrowserPool] Browser ready.")
+            except Exception as e:
+                logger.error(f"[BrowserPool] Failed to start browser pool: {e}")
+                await self._stop_internal()
+                raise
 
     async def recycle_if_needed(self) -> None:
         """Periodically restart Chromium to release accumulated RAM back to system OS."""
@@ -121,39 +142,11 @@ class BrowserPool:
             if self._page_count >= _MAX_PAGES_BEFORE_RECYCLE:
                 logger.info(f"[BrowserPool] Auto-recycling Chromium after {self._page_count} pages to free RAM...")
                 await self._stop_internal()
-                await self._start_internal()
-
-    async def _start_internal(self) -> None:
-        if not self._playwright:
-            self._playwright = await async_playwright().start()
-
-        launch_kwargs: dict = {"headless": True, "args": _STEALTH_ARGS}
-        if self._executable_path:
-            launch_kwargs["executable_path"] = self._executable_path
-
-        self._browser = await self._playwright.chromium.launch(**launch_kwargs)
-        self._page_count = 0
-
-    async def _stop_internal(self) -> None:
-        if self._browser:
-            try:
-                await self._browser.close()
-            except Exception:
-                pass
-            self._browser = None
-        gc.collect()
 
     async def stop(self) -> None:
         async with self._lock:
             logger.info("[BrowserPool] Stopping browser pool...")
             await self._stop_internal()
-            if self._playwright:
-                try:
-                    await self._playwright.stop()
-                except Exception:
-                    pass
-                self._playwright = None
-            gc.collect()
             logger.info("[BrowserPool] Browser pool stopped.")
 
     @asynccontextmanager
@@ -164,20 +157,39 @@ class BrowserPool:
 
         await self.recycle_if_needed()
 
+        if not self._browser or not self._browser.is_connected():
+            await self.start()
+
         ua = random.choice(_USER_AGENTS)
         viewport = random.choice(_VIEWPORTS)
 
-        context = await self._browser.new_context(
-            user_agent=ua,
-            viewport=viewport,
-            java_script_enabled=True,
-            ignore_https_errors=True,
-            extra_http_headers={
-                "Accept-Language": "en-IN,en;q=0.9",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "Connection": "keep-alive",
-            },
-        )
+        try:
+            context = await self._browser.new_context(
+                user_agent=ua,
+                viewport=viewport,
+                java_script_enabled=True,
+                ignore_https_errors=True,
+                extra_http_headers={
+                    "Accept-Language": "en-IN,en;q=0.9",
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    "Connection": "keep-alive",
+                },
+            )
+        except Exception as e:
+            logger.warning(f"[BrowserPool] Failed to open new context ({e}). Recovering browser pool...")
+            await self.stop()
+            await self.start()
+            context = await self._browser.new_context(
+                user_agent=ua,
+                viewport=viewport,
+                java_script_enabled=True,
+                ignore_https_errors=True,
+                extra_http_headers={
+                    "Accept-Language": "en-IN,en;q=0.9",
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    "Connection": "keep-alive",
+                },
+            )
 
         await context.add_init_script("""
             Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
