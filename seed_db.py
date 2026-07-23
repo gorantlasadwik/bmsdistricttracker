@@ -22,7 +22,7 @@ async def run():
         MovieConfig(
             name="Spider-Man: Brand New Day (Regular/3D)",
             city="Chennai",
-            bms_url="https://in.bookmyshow.com/movies/chennai/spider-man-brand-new-day/buytickets/ET00502600/20260801",
+            bms_url="https://in.bookmyshow.com/movies/chennai/spider-man-brand-new-day/buytickets/ET00502600/20260801?etCodes=*&language=english&refEventCode=ET00502600",
             district_url="https://www.district.in/movies/spider-man-brand-new-day-movie-tickets-in-chennai-MV194537?frmtid=rrfdpndypd&fromdate=2026-08-01",
             interval=180,
             enabled=True

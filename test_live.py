@@ -18,7 +18,7 @@ from app.parsers.district import DistrictParser
 
 
 BMS_URLS = [
-    "https://in.bookmyshow.com/movies/chennai/spider-man-brand-new-day/buytickets/ET00502600/20260730",
+    "https://in.bookmyshow.com/movies/chennai/spider-man-brand-new-day/buytickets/ET00502600/20260801?etCodes=*&language=english&refEventCode=ET00502600",
     "https://in.bookmyshow.com/movies/chennai/spider-man-brand-new-day-epiq-3d/buytickets/ET00505581/20260801",
 ]
 

@@ -10,7 +10,7 @@ def run():
     # Update regular movie url to point to 20260801
     cursor.execute(
         "UPDATE movies SET bms_url = ? WHERE name = ?",
-        ("https://in.bookmyshow.com/movies/chennai/spider-man-brand-new-day/buytickets/ET00502600/20260801", 
+        ("https://in.bookmyshow.com/movies/chennai/spider-man-brand-new-day/buytickets/ET00502600/20260801?etCodes=*&language=english&refEventCode=ET00502600", 
          "Spider-Man: Brand New Day (Regular/3D)")
     )
     conn.commit()
