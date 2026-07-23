@@ -132,6 +132,7 @@ class BrowserPool:
                 logger.info("[BrowserPool] Browser ready.")
             except Exception as e:
                 logger.error(f"[BrowserPool] Failed to start browser pool: {e}")
+                self._executable_path = None
                 await self._stop_internal()
                 raise
 
