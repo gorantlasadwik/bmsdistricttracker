@@ -43,6 +43,9 @@ import asyncio
 
 async def self_pinger():
     url = os.environ.get("RENDER_EXTERNAL_URL") or os.environ.get("EXTERNAL_URL")
+    if not url and os.environ.get("RENDER_SERVICE_NAME"):
+        url = f"https://{os.environ['RENDER_SERVICE_NAME']}.onrender.com"
+        
     if not url:
         logger.info("[Pinger] RENDER_EXTERNAL_URL not set. Self-pinger disabled (normal for local runs).")
         return
@@ -51,10 +54,11 @@ async def self_pinger():
     logger.info(f"[Pinger] Starting self-pinger task targeting: {health_url}")
     
     while True:
-        await asyncio.sleep(600)  # Ping every 10 minutes
+        await asyncio.sleep(180)  # Ping every 3 minutes to keep Render free instance active
         try:
-            async with httpx.AsyncClient(timeout=10) as client:
-                resp = await client.get(health_url)
+            async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+                headers = {"User-Agent": "ShowPulser-SelfPinger/1.0"}
+                resp = await client.get(health_url, headers=headers)
                 logger.info(f"[Pinger] Self-ping status: {resp.status_code}")
         except Exception as e:
             logger.error(f"[Pinger] Self-ping failed: {e}")
