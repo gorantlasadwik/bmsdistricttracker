@@ -44,6 +44,7 @@ class Settings(BaseSettings):
 
     # ── App ───────────────────────────────────────────────────────────
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
+    database_url: str = ""
     database_path: str = "data/showpulser.db"
     snapshots_dir: str = "snapshots"
     logs_dir: str = "logs"
