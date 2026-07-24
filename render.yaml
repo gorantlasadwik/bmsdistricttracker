@@ -21,3 +21,5 @@ services:
         value: telegram,whatsapp
       - key: SCAN_INTERVAL_SECONDS
         value: "180"
+      - key: DATABASE_URL
+        sync: false
