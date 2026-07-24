@@ -43,7 +43,7 @@ def _get_pg_url() -> str:
 async def _get_pg_conn():
     if not asyncpg:
         raise ImportError("asyncpg package is required for PostgreSQL database connections.")
-    return await asyncpg.connect(_get_pg_url())
+    return await asyncpg.connect(_get_pg_url(), statement_cache_size=0)
 
 
 # ── PostgreSQL DDL ─────────────────────────────────────────────────────────────
